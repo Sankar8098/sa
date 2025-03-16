@@ -1,4 +1,9 @@
 import random
+import os
+from pyrogram import Client, filters
+from pyrogram.types import ForceReply
+from helper.ffmpeg import add_last_six_seconds
+from helper.database import db
 from helper.ffmpeg import fix_thumb, take_screen_shot
 from pyrogram import Client, filters
 from pyrogram.enums import MessageMediaType
@@ -314,17 +319,23 @@ async def refunc(client, message):
 
         await client.send_document(message.chat.id, output_path, caption="Here is your renamed file!")
 
-from helper.ffmpeg import add_last_six_seconds
-import os
-
 @Client.on_message(filters.command("set6secvideo") & filters.private & filters.video)
 async def set_custom_six_sec(client, message):
-    """ Allow users to set a custom 6-second clip """
+    """ Allows users to set a custom 6-second video clip """
     user_id = message.chat.id
     file_path = f"downloads/{user_id}_6sec.mp4"
     await message.video.download(file_path)
     await db.update_user_setting(user_id, "custom_6_sec", file_path)
-    await message.reply_text("Custom 6-second video saved!")
+    await message.reply_text("Your custom 6-second video has been saved!")
+
+@Client.on_message(filters.command("setlast6") & filters.private)
+async def set_last_six(client, message):
+    """ Toggle the last 6 seconds merge feature """
+    user_id = message.chat.id
+    setting = await db.get_user_setting(user_id, "last_6_sec", False)
+    new_setting = not setting
+    await db.update_user_setting(user_id, "last_6_sec", new_setting)
+    await message.reply_text(f"Last 6 seconds merge {'enabled' if new_setting else 'disabled'}")
 
 @Client.on_message(filters.private & filters.reply)
 async def refunc(client, message):
@@ -336,7 +347,7 @@ async def refunc(client, message):
         file = msg.reply_to_message
         media = getattr(file, file.media.value)
 
-        if not "." in new_name:
+        if "." not in new_name:
             extn = media.file_name.rsplit('.', 1)[-1] if "." in media.file_name else "mkv"
             new_name = f"{new_name}.{extn}"
 
